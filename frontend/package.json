@@ -9,14 +9,17 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@creit-tech/stellar-wallets-kit": "npm:@jsr/creit-tech__stellar-wallets-kit@^2.4.0",
-    "@stellar/stellar-sdk": "^16.0.1",
+    "@rainbow-me/rainbowkit": "^2.2.11",
     "@supabase/supabase-js": "^2.109.0",
+    "@tanstack/react-query": "^5.102.8",
     "@vercel/analytics": "^2.0.1",
+    "@wagmi/core": "^3.6.5",
     "geist": "^1.7.2",
     "next": "^16.2.9",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "viem": "^2.56.3",
+    "wagmi": "^3.7.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

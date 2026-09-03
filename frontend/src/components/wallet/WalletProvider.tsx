@@ -2,52 +2,49 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import type { Session, AuthChangeEvent } from "@supabase/supabase-js";
-import { StellarWalletsKit, Networks } from "@creit-tech/stellar-wallets-kit";
-import { defaultModules } from "@creit-tech/stellar-wallets-kit/modules/utils";
-import { WalletConnectModule, WalletConnectTargetChain } from "@creit-tech/stellar-wallets-kit/modules/wallet-connect";
-import { activeModule } from "@creit-tech/stellar-wallets-kit/state";
-import { WalletState } from "../../types";
 import { supabase } from "../../lib/supabase";
+import { User } from '@supabase/supabase-js';
 
-const walletConnectProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
-const walletStorageKey = "cf_wallet_address";
-const walletIdStorageKey = "cf_wallet_id";
+import '@rainbow-me/rainbowkit/styles.css';
+import {
+  getDefaultConfig,
+  RainbowKitProvider,
+  useConnectModal,
+} from '@rainbow-me/rainbowkit';
+import { WagmiProvider, useAccount, useDisconnect } from 'wagmi';
+import { mainnet, polygon, optimism, arbitrum, base } from 'wagmi/chains';
+import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
+import { type Chain } from 'viem';
 
-function getAppUrl() {
-    if (typeof window === "undefined") return "https://sangam.app";
-    return window.location.origin;
-}
+const walletConnectProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "c0a5a6873551571d3a58e6e5893a903c";
 
-function getWalletModules() {
-    const modules = defaultModules();
+const queryClient = new QueryClient();
 
-    if (walletConnectProjectId) {
-        modules.push(new WalletConnectModule({
-            projectId: walletConnectProjectId,
-            allowedChains: [WalletConnectTargetChain.TESTNET],
-            metadata: {
-                name: "sangam",
-                description: "Sangam — rotating savings on Botchain",
-                url: getAppUrl(),
-                icons: [`${getAppUrl()}/favicon.ico`],
-            },
-        }));
-    }
+// Add Botchain config
+export const botchain = {
+  id: 1337, // Placeholder ID
+  name: 'Botchain',
+  nativeCurrency: { name: 'BOT', symbol: 'BOT', decimals: 18 },
+  rpcUrls: {
+    default: { http: ['https://rpc.botchain.network'] },
+  },
+} as const satisfies Chain;
 
-    return modules;
-}
+export const config = getDefaultConfig({
+  appName: 'sangam.',
+  projectId: walletConnectProjectId,
+  chains: [botchain, mainnet, polygon, optimism, arbitrum, base],
+  ssr: true,
+});
 
-function isMobileBrowser() {
-    if (typeof window === "undefined") return false;
-    return window.matchMedia?.('(pointer: coarse)').matches ?? false;
-}
-
-if (typeof window !== "undefined" && !(window as Window & { _stellarWalletsKitInitialized?: boolean })._stellarWalletsKitInitialized) {
-    StellarWalletsKit.init({
-        modules: getWalletModules(),
-        network: Networks.TESTNET,
-    });
-    (window as Window & { _stellarWalletsKitInitialized?: boolean })._stellarWalletsKitInitialized = true;
+export interface WalletState {
+    address: string | null;
+    isConnecting: boolean;
+    isConnected: boolean;
+    connectionError: string | null;
+    supabaseUser: User | null;
+    isSupabaseLoading: boolean;
+    linkingErrorModal: string | null;
 }
 
 interface WalletContextType extends WalletState {
@@ -60,26 +57,15 @@ interface WalletContextType extends WalletState {
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
-function clearChitfundLocalState() {
-    const prefixes = ["cf_", "chitfund_"];
-    for (let i = localStorage.length - 1; i >= 0; i--) {
-        const key = localStorage.key(i);
-        if (key && prefixes.some((prefix) => key.startsWith(prefix))) {
-            // Do not delete the active fund pointers so they are remembered on reconnect
-            if (!key.startsWith("cf_current_fund_id_")) {
-                localStorage.removeItem(key);
-            }
-        }
-    }
-    sessionStorage.clear();
-}
-
-export function WalletProvider({ children }: { children: React.ReactNode }) {
+function InnerWalletProvider({ children }: { children: React.ReactNode }) {
+    const { address, isConnecting, isConnected } = useAccount();
+    const { disconnectAsync } = useDisconnect();
+    const { openConnectModal } = useConnectModal();
+    
     const [state, setState] = useState<WalletState>({
         address: null,
         isConnecting: false,
         isConnected: false,
-        network: Networks.TESTNET,
         connectionError: null,
         supabaseUser: null,
         isSupabaseLoading: true,
@@ -88,74 +74,34 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
     const clearLinkingError = () => setState(prev => ({ ...prev, linkingErrorModal: null }));
 
+    // Sync Wagmi state to our WalletContext state
     useEffect(() => {
-        const timer = window.setTimeout(() => {
-            const savedAddress = window.localStorage.getItem(walletStorageKey);
-            const savedWalletId = window.localStorage.getItem(walletIdStorageKey);
-            if (!savedAddress) return;
-
-            if (savedWalletId) StellarWalletsKit.setWallet(savedWalletId);
-            setState((prev) => ({
-                ...prev,
-                address: savedAddress,
-                isConnected: true,
-            }));
-        }, 0);
-
-        return () => window.clearTimeout(timer);
-    }, []);
-
-    useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
-            setState((prev) => ({
-                ...prev,
-                supabaseUser: session?.user ?? null,
-                isSupabaseLoading: false,
-            }));
-        });
-
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
-            setState((prev) => ({
-                ...prev,
-                supabaseUser: session?.user ?? null,
-                isSupabaseLoading: false,
-            }));
-            if (session?.user) {
-                const currentWallet = localStorage.getItem(walletStorageKey);
-                if (currentWallet) {
-                    linkWalletToGoogle(currentWallet, session.user);
-                }
-            }
-        });
-
-        return () => subscription.unsubscribe();
-    }, []);
+        setState(prev => ({
+            ...prev,
+            address: address ? (address as string) : null,
+            isConnected,
+            isConnecting
+        }));
+    }, [address, isConnected, isConnecting]);
 
     const linkWalletToGoogle = async (walletAddress: string, user: { id: string; email?: string; user_metadata?: Record<string, string> }) => {
         try {
-            // Check if this wallet is already linked to someone else
             const { data: existingWallet, error: fetchError } = await supabase
                 .from('users')
                 .select('*')
                 .eq('wallet_address', walletAddress)
                 .maybeSingle();
 
-            if (fetchError) {
-                console.error("Fetch error:", fetchError);
-            }
-
             if (existingWallet && existingWallet.google_id !== user.id) {
                 await supabase.auth.signOut();
                 setState(prev => ({ 
                     ...prev, 
-                    connectionError: null, 
                     supabaseUser: null,
                     linkingErrorModal: "This wallet is already associated with another Google account. Please sign in with the original account or connect a different wallet." 
                 }));
                 return;
             }
 
-            // Upsert the user profile
             const { error } = await supabase
                 .from('users')
                 .upsert({
@@ -171,16 +117,14 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
                 if (error.code === '23505') { 
                      setState(prev => ({ 
                          ...prev, 
-                         connectionError: null,
                          supabaseUser: null,
                          linkingErrorModal: "This Google account is already linked to a different wallet. Please use the original Google account or connect a new wallet." 
                      }));
                 } else {
                      setState(prev => ({ 
                          ...prev, 
-                         connectionError: null,
                          supabaseUser: null,
-                         linkingErrorModal: `Database Error: ${error.message} (Code: ${error.code}). If you enabled RLS, please disable it or add a policy.` 
+                         linkingErrorModal: `Database Error: ${error.message} (Code: ${error.code})` 
                      }));
                 }
             }
@@ -189,81 +133,44 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             await supabase.auth.signOut();
             setState(prev => ({ 
                 ...prev, 
-                connectionError: null,
                 supabaseUser: null,
                 linkingErrorModal: `Unexpected Error: ${err instanceof Error ? err.message : String(err)}` 
             }));
         }
     };
 
-    const connect = async () => {
-        try {
-            if (isMobileBrowser() && !walletConnectProjectId) {
-                throw new Error("Mobile wallet connection needs NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID. Add a WalletConnect/Reown project id, then connect with Freighter mobile or another WalletConnect wallet.");
-            }
-
-            setState((prev) => ({ ...prev, isConnecting: true, connectionError: null }));
-            const { address } = await StellarWalletsKit.authModal();
-            const previousAddress = localStorage.getItem(walletStorageKey);
-
-            if (previousAddress && previousAddress !== address) {
-                clearChitfundLocalState();
-            }
-
-            localStorage.setItem(walletStorageKey, address);
-            const selectedWalletId = activeModule.value?.productId;
-            if (selectedWalletId) localStorage.setItem(walletIdStorageKey, selectedWalletId);
-
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
             setState((prev) => ({
                 ...prev,
-                address,
-                isConnected: true,
-                isConnecting: false,
+                supabaseUser: session?.user ?? null,
+                isSupabaseLoading: false,
             }));
-            
-            // Try linking right after wallet connect if user is already logged in
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session?.user) {
-                await linkWalletToGoogle(address, session.user);
-            }
-        } catch (error: unknown) {
-            console.error("Failed to connect wallet:", error);
-            
-            let errorMessage = "Connection failed";
-            if (error instanceof Error) {
-                errorMessage = error.message;
-            } else if (error && typeof error === 'object' && 'message' in error) {
-                errorMessage = String(error.message);
-            } else if (typeof error === 'string') {
-                errorMessage = error;
-            }
+        });
 
-            const isCancellation = errorMessage.toLowerCase().includes('close') || 
-                                   errorMessage.toLowerCase().includes('reject') || 
-                                   errorMessage.toLowerCase().includes('cancel');
-
-            setState((prev) => ({ 
-                ...prev, 
-                isConnecting: false,
-                connectionError: isCancellation ? null : errorMessage
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setState((prev) => ({
+                ...prev,
+                supabaseUser: session?.user ?? null,
+                isSupabaseLoading: false,
             }));
+            if (session?.user && address) {
+                linkWalletToGoogle(address as string, session.user);
+            }
+        });
+
+        return () => subscription.unsubscribe();
+    }, [address]);
+
+    const connect = async () => {
+        if (openConnectModal) {
+            openConnectModal();
         }
     };
 
     const disconnect = async () => {
-        try {
-            await StellarWalletsKit.disconnect();
-            clearChitfundLocalState();
-            setState(prev => ({
-                ...prev,
-                address: null,
-                isConnecting: false,
-                isConnected: false,
-                network: Networks.TESTNET,
-                connectionError: null,
-            }));
-        } catch (error) {
-            console.error("Failed to disconnect wallet:", error);
+        if (disconnectAsync) {
+            await disconnectAsync();
         }
     };
 
@@ -296,6 +203,20 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
                 </div>
             )}
         </WalletContext.Provider>
+    );
+}
+
+export function WalletProvider({ children }: { children: React.ReactNode }) {
+    return (
+        <WagmiProvider config={config}>
+            <QueryClientProvider client={queryClient}>
+                <RainbowKitProvider>
+                    <InnerWalletProvider>
+                        {children}
+                    </InnerWalletProvider>
+                </RainbowKitProvider>
+            </QueryClientProvider>
+        </WagmiProvider>
     );
 }
 

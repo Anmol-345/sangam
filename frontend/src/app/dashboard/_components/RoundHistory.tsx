@@ -1,4 +1,4 @@
-import { shortenAddress } from "@/lib/stellar";
+import { shortenAddress } from "@/lib/utils";
 import type { RoundSummary } from "@/lib/contract";
 
 interface RoundHistoryProps {

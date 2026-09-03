@@ -77,7 +77,7 @@ function ChitFundVisual({ fadeStyle }: { fadeStyle: (delay: number) => React.CSS
         })}
         <circle cx={CENTER} cy={CENTER} r={28} fill="var(--accent-light)" stroke="rgba(22,163,74,0.2)" strokeWidth={1.5} />
         <text x={CENTER} y={CENTER - 5} textAnchor="middle" fontSize={8} fontWeight={600} fill="var(--accent)" fontFamily="var(--font-mono)" letterSpacing={1}>POT</text>
-        <text x={CENTER} y={CENTER + 8} textAnchor="middle" fontSize={7} fill="var(--accent)" fontFamily="var(--font-mono)" opacity={0.7}>USDC</text>
+        <text x={CENTER} y={CENTER + 8} textAnchor="middle" fontSize={7} fill="var(--accent)" fontFamily="var(--font-mono)" opacity={0.7}>BOT</text>
       </svg>
     </div>
   );
@@ -229,8 +229,8 @@ export default function HeroSection() {
           >
             {[
               { label: "Smart contract escrow" },
-              { label: "USDC stablecoin" },
-              { label: "Testnet" },
+              { label: "Native BOT currency" },
+              { label: "Mainnet" },
             ].map((b) => (
               <div key={b.label} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                 <div style={{

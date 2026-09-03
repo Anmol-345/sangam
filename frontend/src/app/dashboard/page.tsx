@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useWallet } from "@/components/wallet/WalletProvider";
 import Navbar from "@/components/Navbar";
-import { shortenAddress, stroopsToDisplay } from "@/lib/stellar";
+import { shortenAddress, stroopsToDisplay } from "@/lib/utils";
 import { useFund, sameAddress, fundStateName, hasMember } from "./_hooks/useFund";
 import { useFundActions } from "./_hooks/useFundActions";
 import { FundStats } from "./_components/FundStats";

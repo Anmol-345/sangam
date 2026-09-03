@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import type { FundSummary, MemberStatus } from "@/lib/contract";
-import { shortenAddress } from "@/lib/stellar";
+import { shortenAddress } from "@/lib/utils";
 import { sameAddress } from "../_hooks/useFund";
 import { supabase } from "@/lib/supabase";
 

@@ -1,5 +1,5 @@
 import type { FundSummary } from "@/lib/contract";
-import { stroopsToDisplay } from "@/lib/stellar";
+import { stroopsToDisplay } from "@/lib/utils";
 
 interface FundStatsProps {
   summary: FundSummary;

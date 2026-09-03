@@ -10,7 +10,7 @@ import {
   revealHash,
   claimPot,
 } from "@/lib/contract";
-import { usdcToStroops, USDC_CONTRACT_ID } from "@/lib/stellar";
+import { parseEther } from "viem";
 import { parseError } from "../_lib/parseError";
 import { toFundIdNumber, type FetchOptions } from "./useFund";
 import type { FundSummary, MemberStatus, RoundSummary } from "@/lib/contract";
@@ -111,9 +111,9 @@ export function useFundActions({
     const members = Number(createMembers);
     if (amount <= 0) { setActionError("Amount must be greater than 0."); return; }
     if (members < 2 || members > 10) { setActionError("Members must be between 2 and 10."); return; }
-    if (!USDC_CONTRACT_ID) { setActionError("USDC Contract ID is missing from configuration."); return; }
     runAction(async () => {
-      const newFundId = toFundIdNumber(await createChitFund(address!, USDC_CONTRACT_ID, createName, usdcToStroops(createAmount), members));
+      const contributionInWei = parseEther(amount.toString());
+      const newFundId = toFundIdNumber(await createChitFund(address!, "Native BOT", createName, contributionInWei, members));
       if (!newFundId) throw new Error("Could not read the new fund ID.");
       setCurrentFundId(newFundId);
       setShowCreate(false);
