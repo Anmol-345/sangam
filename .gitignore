@@ -1,0 +1,23 @@
+# Rust
+contracts/chit-fund/target/
+*.wasm
+
+# Node
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Env
+.env
+.env.local
+*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+plan.md
+
+frontend/test-simulate.mjs
+pnpm-install.log
+cf-prototype.html
